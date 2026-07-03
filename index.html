@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="utf-8" />
+  <title>📅 朋友揪一揪</title>
+  <!-- 引入 FullCalendar CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+  <!-- 引入 html2canvas 截圖套件 CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  
+  <style>
+    body { font-family: 'Microsoft JhengHei', Arial, sans-serif; margin: 20px; background-color: #f0f4f8; color: #333; }
+    .container { max-width: 1000px; margin: 0 auto; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    h2 { margin-top: 0; color: #1a365d; display: flex; align-items: center; justify-content: space-between; }
+    
+    /* 頂部控制列 */
+    .action-bar { margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; background: #edf2f7; padding: 15px; border-radius: 8px; }
+    .action-bar-left { display: flex; align-items: center; gap: 15px; }
+    .status-badge { font-weight: bold; padding: 6px 12px; border-radius: 20px; background: #fff; border: 1px solid #cbd5e0; }
+    
+    /* 按鈕樣式組合 */
+    button { padding: 10px 20px; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 14px; transition: background 0.2s; }
+    #openModalBtn { background: #3182ce; }
+    #openModalBtn:hover { background: #2b6cb0; }
+    #screenshotBtn { background: #319795; display: flex; align-items: center; gap: 6px; }
+    #screenshotBtn:hover { background: #2c7a7b; }
+    
+    /* 模式提示燈 */
+    .mode-indicator { display: none; font-weight: bold; padding: 10px 15px; border-radius: 6px; margin-bottom: 15px; }
+    .mode-ok { background: #c6f6d5; color: #22543d; border: 1px solid #38a169; }
+    .mode-no { background: #fed7d7; color: #742a2a; border: 1px solid #e53e3e; }
+
+    /* 行事曆外包裝 */
+    .calendar-wrap { background: white; padding: 10px; border-radius: 8px; margin-bottom: 25px; }
+    #calendar { background: white; }
+    
+    /* 統計分析區 */
+    .summary-zone { background: #fffaf0; border: 1px solid #feebc8; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
+    .summary-zone h3 { margin: 0 0 10px 0; color: #dd6b20; font-size: 16px; }
+    #matchResults { font-size: 14px; color: #744210; line-height: 1.8; }
+    .match-item { margin-bottom: 6px; padding: 4px 8px; border-radius: 4px; }
+    .perfect-day { background-color: #f0fff4; border-left: 4px solid #38a169; }
+    .conflict-day { background-color: #fff5f5; border-left: 4px solid #e53e3e; }
+
+    /* 資料備份區 */
+    .io-zone { background: #f7fafc; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; position: relative; }
+    textarea { width: 100%; height: 110px; font-family: monospace; margin-top: 5px; box-sizing: border-box; border: 2px solid #cbd5e0; border-radius: 4px; padding: 8px; transition: border-color 0.3s, background-color 0.3s; background-color: #ffffff; }
+    textarea.updated { border-color: #38a169; background-color: #f0fff4; }
+    .btn-group { margin-top: 10px; display: flex; gap: 10px; }
+    #importBtn { background: #4a5568; } #importBtn:hover { background: #2d3748; }
+    .auto-save-tag { position: absolute; top: 15px; right: 15px; color: #38a169; font-weight: bold; font-size: 12px; display: none; }
+
+    /* 彈出視窗 (Modal) 樣式 */
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; justify-content: center; align-items: center; }
+    .modal-content { background: white; padding: 30px; border-radius: 12px; width: 90%; max-width: 400px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
+    .modal-content h3 { margin-top: 0; color: #2d3748; border-bottom: 2px solid #edf2f7; padding-bottom: 10px; }
+    .form-group { margin-bottom: 18px; }
+    .form-group label { display: block; font-weight: bold; margin-bottom: 8px; color: #4a5568; }
+    .form-group input[type="text"] { width: 100%; padding: 10px; border: 1px solid #cbd5e0; border-radius: 6px; box-sizing: border-box; font-size: 14px; }
+    .radio-group { display: flex; gap: 15px; margin-top: 5px; }
+    .radio-group label { font-weight: normal; display: flex; align-items: center; gap: 5px; cursor: pointer; }
+    
+    .modal-footer { display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #edf2f7; padding-top: 15px; }
+    .btn-cancel { background: #e2e8f0; color: #4a5568; } .btn-cancel:hover { background: #cbd5e0; }
+    .btn-submit { background: #3182ce; } .btn-submit:hover { background: #2b6cb0; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h2>🥳 朋友揪團！超方便的行事曆</h2>
+  
+  <!-- 頂部控制列 -->
+  <div class="action-bar">
+    <div class="action-bar-left">
+      <button id="openModalBtn">👤 登入/切換填寫者與狀態</button>
+      <div class="status-badge">當前填寫人：<span id="currentUserDisplay">未登入 (請先點左邊)</span></div>
+    </div>
+    <button id="screenshotBtn">📸 擷取行事曆畫面 (下載圖片)</button>
+  </div>
+
+  <!-- 填寫狀態提示燈 -->
+  <div id="modeIndicator" class="mode-indicator"></div>
+  
+  <!-- 行事曆主體 -->
+  <div class="calendar-wrap" id="captureArea">
+    <div id='calendar'></div>
+  </div>
+
+  <!-- 統計結果 -->
+  <div class="summary-zone">
+    <h3>📊 最佳聚會日子推薦（依衝突人數最少排序）：</h3>
+    <div id="matchResults">目前行事曆為空，請貼上舊紀錄或登入填寫！</div>
+  </div>
+
+  <!-- 資料匯入匯出區 -->
+  <div class="io-zone">
+    <strong>💾 全體時間紀錄文字檔 (JSON 陣列)</strong>
+    <span id="autoSaveTag" class="auto-save-tag">● 系統已即時自動儲存更新</span>
+    <p style="font-size: 13px; color: #718096; margin: 5px 0;">
+      💡 <b>如何使用：</b><br>
+      1. 【載入】：之後的使用者打開網頁時，請直接<b>把上一位朋友傳的文字「全選覆蓋貼在下方文字框」</b>，然後點擊「📥 載入文字框內的現有紀錄」。<br>
+      2. 【匯出】：您在月曆上點選時，下方的文字會<b>自動同步更新</b>，填完後直接把裡面的文字複製傳給下一位朋友即可。
+    </p>
+    <textarea id="dataBox" placeholder="請在此貼上舊的 JSON 紀錄，或直接填寫日曆讓系統自動產生..."></textarea>
+    <div class="btn-group">
+      <button id="importBtn">📥 載入文字框內的現有紀錄</button>
+    </div>
+  </div>
+</div>
+
+<!-- 設定暱稱與模式的彈出視窗 -->
+<div class="modal-overlay" id="surveyModal">
+  <div class="modal-content">
+    <h3>👤 開始填寫時間</h3>
+    
+    <div class="form-group">
+      <label for="inputName">1. 你的名字或暱稱：</label>
+      <input type="text" id="inputName" placeholder="例如：小明、老王">
+    </div>
+    
+    <div class="form-group">
+      <label>2. 您接下來要在月曆上點選：</label>
+      <div class="radio-group">
+        <label><input type="radio" name="selectMode" value="OK" checked> 🟢 我可以的日子</label>
+        <label><input type="radio" name="selectMode" value="NO"> 🔴 我不行的日子</label>
+      </div>
+    </div>
+    
+    <div class="modal-footer">
+      <button class="btn-cancel" id="closeModalBtn">取消</button>
+      <button class="btn-submit" id="submitFormBtn">進入點選模式</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  let currentName = "";
+  let currentMode = "OK"; 
+
+  document.addEventListener('DOMContentLoaded', function() {
+    var calendarEl = document.getElementById('calendar');
+    var dataBox = document.getElementById('dataBox');
+    var autoSaveTag = document.getElementById('autoSaveTag');
+    
+    // 初始化 FullCalendar
+    var calendar = new FullCalendar.Calendar(calendarEl, {
+      initialView: 'dayGridMonth',
+      editable: false,
+      selectable: true, 
+      events: [],       
+      
+      select: function(info) {
+        if (!currentName) {
+          alert("請先點擊頂部的「登入/切換填寫者與狀態」按鈕輸入名字，才能開始點選喔！");
+          calendar.unselect();
+          return;
+        }
+
+        let currentDate = new Date(info.startStr);
+        let endDate = new Date(info.endStr);
+        let isChanged = false;
+
+        while (currentDate < endDate) {
+          let dateStr = currentDate.toISOString().split('T')[0];
+          let existingEvents = calendar.getEvents();
+          let oldEvent = existingEvents.find(e => e.startStr === dateStr && e.title.startsWith(currentName + " "));
+          let proceed = true;
+
+          if (oldEvent) {
+            let oldStatus = oldEvent.title.endsWith("OK") ? "OK" : "NO";
+            
+            if (oldStatus === currentMode) {
+              oldEvent.remove(); 
+              isChanged = true;
+              proceed = false;
+            } else {
+              let oldStatusText = oldStatus === "OK" ? "【可以 🟢】" : "【不行 🔴】";
+              let newStatusText = currentMode === "OK" ? "【可以 🟢】" : "【不行 🔴】";
+              
+              let confirmOverlap = confirm(`⚠️ 重疊提示！\n您在 ${dateStr} 這天先前已經選擇了 ${oldStatusText}。\n確定要將它覆蓋修改為 ${newStatusText} 嗎？\n(點擊取消將保留原本選擇)`);
+              
+              if (confirmOverlap) {
+                oldEvent.remove();
+                isChanged = true;
+                proceed = true; 
+              } else {
+                proceed = false;
+              }
+            }
+          } else {
+            isChanged = true;
+            proceed = true;
+          }
+
+          if (proceed) {
+            if (currentMode === "OK") {
+              calendar.addEvent({ title: currentName + " OK", start: dateStr, color: '#38a169', allDay: true });
+            } else {
+              calendar.addEvent({ title: currentName + " 不行❌", start: dateStr, color: '#e53e3e', allDay: true });
+            }
+          }
+
+          currentDate.setDate(currentDate.getDate() + 1);
+        }
+
+        calendar.unselect();
+        
+        if (isChanged) {
+          calculateMatches();
+          autoExportToBox();
+        }
+      },
+      
+      eventClick: function(info) {
+        if (confirm("要手動刪除 『" + info.event.title + "』 這筆紀錄嗎？")) {
+          info.event.remove();
+          calculateMatches();
+          autoExportToBox();
+        }
+      },
+      datesSet: function() {
+        calculateMatches();
+      }
+    });
+    
+    calendar.render();
+    dataBox.value = "[]";
+
+    // --- 彈出視窗控制 ---
+    const modal = document.getElementById('surveyModal');
+    const indicator = document.getElementById('modeIndicator');
+
+    document.getElementById('openModalBtn').addEventListener('click', () => {
+      if(currentName) document.getElementById('inputName').value = currentName;
+      modal.style.display = 'flex';
+    });
+    
+    document.getElementById('closeModalBtn').addEventListener('click', () => {
+      modal.style.display = 'none';
+    });
+
+    document.getElementById('submitFormBtn').addEventListener('click', () => {
+      let nameInput = document.getElementById('inputName').value.trim();
+      if (!nameInput) {
+        alert("請填寫名字！");
+        return;
+      }
+
+      currentName = nameInput;
+      currentMode = document.querySelector('input[name="selectMode"]:checked').value;
+
+      document.getElementById('currentUserDisplay').innerText = currentName;
+      modal.style.display = 'none';
+
+      indicator.style.display = 'block';
+      if (currentMode === "OK") {
+        indicator.className = "mode-indicator mode-ok";
+        indicator.innerHTML = `🎯 <b>【點選模式中】</b> 🙋‍♂️ <b>${currentName}</b>，請在月曆上點選/拖曳你<b>「可以 🟢」</b>的日子。`;
+      } else {
+        indicator.className = "mode-indicator mode-no";
+        indicator.innerHTML = `🎯 <b>【點選模式中】</b> 🙋‍♂️ <b>${currentName}</b>，請在月曆上點選/拖曳你<b>「絕對不行 🔴」</b>的日子。`;
+      }
+    });
+
+    // --- 自動同步匯出核心函式 ---
+    function autoExportToBox() {
+      var events = calendar.getEvents();
+      var eventData = events.map(function(e) {
+        return { title: e.title, start: e.startStr, color: e.backgroundColor, allDay: true };
+      });
+      
+      dataBox.value = JSON.stringify(eventData, null, 2);
+      
+      autoSaveTag.style.display = 'inline';
+      dataBox.classList.add('updated');
+      setTimeout(() => {
+        dataBox.classList.remove('updated');
+      }, 500);
+    }
+
+    // --- 核心邏輯：計算黃金聚會日 (全新智能排序演算法) ---
+    function calculateMatches() {
+      let events = calendar.getEvents();
+      let dateStatus = {}; 
+
+      // 1. 統計每一天，誰可以、誰不行
+      events.forEach(e => {
+        let dateStr = e.startStr;
+        if (!dateStatus[dateStr]) dateStatus[dateStr] = { ok: [], no: [] };
+        
+        if (e.title.endsWith("OK")) {
+          let name = e.title.replace(" OK", "");
+          if (!dateStatus[dateStr].ok.includes(name)) dateStatus[dateStr].ok.push(name);
+        } else if (e.title.endsWith("不行❌")) {
+          let name = e.title.replace(" 不行❌", "");
+          if (!dateStatus[dateStr].no.includes(name)) dateStatus[dateStr].no.push(name);
+        }
+      });
+
+      // 2. 轉換為陣列，過濾掉「只有少於2人參與且沒人衝突」的無意義日子
+      let dateList = [];
+      for (let date in dateStatus) {
+        let info = dateStatus[date];
+        // 只有在「有人填可以」的情況下才排入推薦清單
+        if (info.ok.length > 0) {
+          dateList.push({
+            date: date,
+            okCount: info.ok.length,
+            noCount: info.no.length,
+            okList: info.ok,
+            noList: info.no
+          });
+        }
+      }
+
+      // 3. 【核心排序邏輯】
+      dateList.sort((a, b) => {
+        // 第一優先：衝突人數越少（0人衝突）的越靠前
+        if (a.noCount !== b.noCount) {
+          return a.noCount - b.noCount;
+        }
+        // 第二優先：衝突人數一樣時，可以的人數越多越靠前
+        if (a.okCount !== b.okCount) {
+          return b.okCount - a.okCount;
+        }
+        // 第三優先：都一樣時，按日期時間先後排
+        return a.date.localeCompare(b.date);
+      });
+
+      // 4. 渲染成精美的 HTML 列表
+      let matchHtml = "";
+      
+      if (dateList.length === 0) {
+        matchHtml = "目前還沒有任何時間紀錄。請大家開始點選或載入紀錄！";
+      } else {
+        dateList.forEach(item => {
+          if (item.noCount === 0) {
+            // 完美日子的排版（綠色高亮區塊）
+            if (item.okCount >= 2) {
+              matchHtml += `
+                <div class="match-item perfect-day">
+                  🌟 <b>${item.date}</b> ── <b>完美日子！</b> 共有 <b>${item.okCount}</b> 人可以（${item.okList.join(', ')}），且<b>無人衝突！</b>
+                </div>`;
+            } else {
+              // 雖然沒人衝突，但只有1人可以，稍微標註
+              matchHtml += `
+                <div class="match-item" style="background-color: #f7fafc; border-left: 4px solid #cbd5e0;">
+                  ○ <b>${item.date}</b> ── 只有 1 人可以（${item.okList[0]}），但無人衝突。
+                </div>`;
+            }
+          } else {
+            // 有衝突日子的排版（粉紅色警示區塊）
+            matchHtml += `
+              <div class="match-item conflict-day">
+                ⚠️ <b>${item.date}</b> ── 共有 <b>${item.okCount}</b> 人可以（${item.okList.join(', ')}），但有 <span style="color:#e53e3e; font-weight:bold;">${item.noCount} 人衝突</span>（❌ 不行的人：${item.noList.join(', ')}）
+              </div>`;
+          }
+        });
+      }
+
+      document.getElementById("matchResults").innerHTML = matchHtml;
+    }
+
+    // 【載入外部紀錄】
+    document.getElementById('importBtn').addEventListener('click', function() {
+      try {
+        var parsedData = JSON.parse(dataBox.value.trim());
+        if (Array.isArray(parsedData)) {
+          calendar.removeAllEvents();
+          calendar.addEventSource(parsedData);
+          setTimeout(calculateMatches, 100);
+          alert('過往群組紀錄已成功載入！所有人的時間都出來了。現在您可以點擊上方按鈕開始追加您的時間。');
+        } else {
+          alert('格式錯誤，請確保貼上的是原本複製的完整的 JSON 陣列 [ ... ]！');
+        }
+      } catch (e) {
+        alert('解析失敗！請確認有完整複製上一個人傳來的 JSON 文字，並且有正確貼入格子中。');
+      }
+    });
+
+    // 📸 【一鍵網頁截圖下載功能】
+    document.getElementById('screenshotBtn').addEventListener('click', function() {
+      const captureArea = document.getElementById('captureArea');
+      const originalText = this.innerText;
+      this.innerText = "⏳ 正在產生圖片...";
+      this.disabled = true;
+
+      html2canvas(captureArea, {
+        backgroundColor: "#ffffff",
+        scale: 2, 
+        logging: false,
+        useCORS: true 
+      }).then(canvas => {
+        const imageData = canvas.toDataURL("image/png");
+        const downloadLink = document.createElement('a');
+        const today = new Date().toISOString().split('T')[0];
+        
+        downloadLink.href = imageData;
+        downloadLink.download = `朋友聚會行事曆_${today}.png`;
+        
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+
+        this.innerText = originalText;
+        this.disabled = false;
+      }).catch(err => {
+        alert("截圖失敗，請稍後再試！");
+        this.innerText = originalText;
+        this.disabled = false;
+        console.error(err);
+      });
+    });
+  });
+</script>
+
+</body>
+</html>
