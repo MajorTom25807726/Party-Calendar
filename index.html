@@ -1,11 +1,9 @@
-<!DOCTYPE html>　
+<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
   <meta charset="utf-8" />
   <title>📅 朋友揪一揪</title>
-  <!-- 引入 FullCalendar CDN -->
   <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
-  <!-- 引入 html2canvas 截圖套件 CDN -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   
   <style>
@@ -70,7 +68,6 @@
 <div class="container">
   <h2>🥳 朋友揪團！超方便的行事曆</h2>
   
-  <!-- 頂部控制列 -->
   <div class="action-bar">
     <div class="action-bar-left">
       <button id="openModalBtn">👤 登入/切換填寫者與狀態</button>
@@ -79,21 +76,17 @@
     <button id="screenshotBtn">📸 擷取行事曆畫面 (下載圖片)</button>
   </div>
 
-  <!-- 填寫狀態提示燈 -->
   <div id="modeIndicator" class="mode-indicator"></div>
   
-  <!-- 行事曆主體 -->
   <div class="calendar-wrap" id="captureArea">
     <div id='calendar'></div>
   </div>
 
-  <!-- 統計結果 -->
   <div class="summary-zone">
     <h3>📊 最佳聚會日子推薦（依衝突人數最少排序）：</h3>
     <div id="matchResults">目前行事曆為空，請貼上舊紀錄或登入填寫！</div>
   </div>
 
-  <!-- 資料匯入匯出區 -->
   <div class="io-zone">
     <strong>💾 全體時間紀錄文字檔 (JSON 陣列)</strong>
     <span id="autoSaveTag" class="auto-save-tag">● 系統已即時自動儲存更新</span>
@@ -109,7 +102,6 @@
   </div>
 </div>
 
-<!-- 設定暱稱與模式的彈出視窗 -->
 <div class="modal-overlay" id="surveyModal">
   <div class="modal-content">
     <h3>👤 開始填寫時間</h3>
@@ -146,6 +138,13 @@
     // 初始化 FullCalendar
     var calendar = new FullCalendar.Calendar(calendarEl, {
       initialView: 'dayGridMonth',
+      locale: 'zh-tw', // ✨ 關鍵修改：加入這一行直接切換成繁體中文
+
+      // ✨ 加入下方這段來強制修改按鈕文字
+      buttonText: {
+        today: '今天'
+      },
+
       editable: false,
       selectable: true, 
       events: [],       
